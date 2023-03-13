@@ -78,10 +78,40 @@ rides[, distance := distance - min(distance), by=test_id]
 
 
 
+
+
+
+
+
+
+
+
 # Remove ride after finish line ================================================
-lap_length <- 1386/47*1000  # do dynamically from testing
+fread("Mountain_Route_Distance_Test.csv") ->
+  distance_test 
+
+
+# TODO: make this take an average for all markers
+
+
+
+distance_test[, time:=as.numeric(timestamp-min(timestamp))]
+
+lap_length <- distance_test[time==34|time==(3600*14 + 22*60 + 16), diff(distance)/50]
+
+
+# - here to get av
+distance_test[, lap := 1+(distance%/%..lap_length)]
+distance_test[, lap_distance := distance - min(distance), by=lap]
+
+
 rides[distance <= lap_length] ->
   rides
+
+
+
+
+
 
 
 
@@ -105,6 +135,10 @@ rides[distance> 5500&distance<= 9500, sector:="epic kom"]
 
 
 
+
+# TODO: getting sector start/end points
+distance_test[time==(6*60 + 16)|
+                time==(3600*14 + 60*29 + 14), lap_distance]
 
 
 
@@ -135,7 +169,7 @@ test_summary[power<=300] %>%
 
 # Summarise Sectors ============================================================
 rides[!is.na(sector), 
-      .("speed"=max(distance-min(distance))/max(time-min(time))*3.6),
+      .("speed"=max(distance)/max(time)*3.6),
       keyby=.(sector, power, frame, wheel)] ->
   sector_summary
 
