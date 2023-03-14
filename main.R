@@ -28,7 +28,8 @@ seconds_to_time <- function(seconds, return_hours=TRUE, return_seconds=TRUE){
 
 # DATA =========================================================================
 # Read in test log (from google sheets) ----------------------------------------
-read_sheet("https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUxeqYrXXT58_0c2Hp1k") %>% 
+read_sheet("https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUxeqYrXXT58_0c2Hp1k",
+           sheet="test_data") %>% 
   data.table() ->
   tests
 
@@ -83,7 +84,7 @@ distance_test[, time:=as.numeric(timestamp-min(timestamp))]
 
 # - read in markers data (timestamps at 25 landmarks on lap 1 and 51)
 read_sheet("https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUxeqYrXXT58_0c2Hp1k",
-           sheet=2) %>% 
+           sheet="mountain_route_markers") %>% 
   data.table() ->
   markers
 
@@ -214,13 +215,23 @@ sector_summary[power<=300, dcast(.SD, ...~sector, value.var="speed")] %>%
     geom_point(alpha=0.4)
 
 
+
+
+
+
 # ZwifterBikes =================================================================
-tests[!is.na(zb_hrs), zb := (3600*zb_hrs + 60*zb_mins + zb_secs)]
+read_sheet("https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUxeqYrXXT58_0c2Hp1k",
+           sheet="zwifterbikes") %>% 
+  data.table() ->
+  zwifterbikes
 
+zwifterbikes[, zb:=hours*3600 + minutes*60 + seconds]
 
-tests[, .(frame, wheel, power, zb)][
-  test_summary[power==300, .(frame, wheel, power, seconds)], 
-  on=c("frame", "wheel", "power")] %>% 
+zwifterbikes <- zwifterbikes[, .(frame, wheel, zb)][
+  crossed[power==300, .(frame, wheel, seconds)], 
+  on=c("frame", "wheel")]
+
+zwifterbikes %>% 
   ggplot(aes(x=zb, y=seconds)) +
     geom_abline(intercept=0, slope=1) +
     scale_x_continuous("ZwifterBikes predicted time (hh:mm)", 
@@ -236,11 +247,7 @@ tests[, .(frame, wheel, power, zb)][
     geom_smooth(method="lm", se = FALSE, fullrange=TRUE)
 
 
-tests[, .(frame, wheel, power, zb)][
-  test_summary[power==300, .(frame, wheel, power, seconds)], 
-  on=c("frame", "wheel", "power")][, summary(lm(seconds~zb))]
-
-
+zwifterbikes[, summary(lm(seconds~zb))]
 
 
 
