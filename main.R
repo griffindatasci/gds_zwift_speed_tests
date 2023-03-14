@@ -27,13 +27,6 @@ seconds_to_time <- function(seconds, return_hours=TRUE, return_seconds=TRUE){
 
 
 # DATA =========================================================================
-# Read in test log (from google sheets) ----------------------------------------
-read_sheet("https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUxeqYrXXT58_0c2Hp1k",
-           sheet="test_data") %>% 
-  data.table() ->
-  tests
-
-
 # Read .fit files and write to .csv (quicker loading) --------------------------
 # - List of .fit files, reduced to those not already saved as .csvs
 fit_files <- gsub(".fit", "", list.files("fit_files", pattern=".fit"))
@@ -47,6 +40,18 @@ lapply(fit_files,
            records() %>%
            fwrite(file=paste0("csv_files/", file, ".csv"))
        })
+
+
+# Read in test log (from google sheets) ----------------------------------------
+read_sheet("https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUxeqYrXXT58_0c2Hp1k",
+           sheet="test_data") %>% 
+  data.table() ->
+  tests
+
+
+if(length(tests[!is.na(url), test_id][!(tests[!is.na(url), test_id] %in% gsub(".csv", "", list.files("csv_files/", pattern=".csv")))])>0){
+  stop("Not all rides are downloaded.")
+}
 
 
 # Read in ride data into a single dataset --------------------------------------
@@ -176,21 +181,23 @@ crossed[, "seconds":=..lap_length/speed*3.6]
 crossed[, "time":=seconds_to_time(seconds)]
 
 
+
+
 # Summarise ====================================================================
-crossed[power %in% c(150, 300), 
+crossed[power!=900, n_tests := .N, by=.(frame, wheel)]
+crossed[power!=900 & power!=225, 
              .(frame, wheel, "cost"=seconds-min(seconds)), 
              by=power] %>% 
   ggplot(aes(x=power, y=cost, colour=frame, shape=wheel)) +
-  geom_point() +
+  geom_point(alpha=0.5) +
   geom_path() +
   scale_y_reverse("Seconds Behind Fastest Bike") +
   scale_x_continuous("Power",
                      breaks=c(150,300),
                      labels=c("150W (2W/kg)", "300W (4W/kg)")) +
   labs(colour="Frame", shape="Wheel") +
-  theme_classic()
-
-
+  theme_classic() ->
+  crossover_plot
 
 
 
@@ -211,8 +218,11 @@ rides[!is.na(sector),
 
 sector_summary[, speed:=scale(speed), by=.(power, sector)]
 sector_summary[power<=300, dcast(.SD, ...~sector, value.var="speed")] %>% 
-  ggplot(aes(x=`Ocean Blvd.`, y=`Epic Climb`, colour=frame, shape=wheel)) +
-    geom_point(alpha=0.4)
+  ggplot(aes(x=`Ocean Blvd.`, y=`Epic Climb`, colour=as.factor(power))) +
+  geom_point() +
+  geom_smooth(method = "lm", se=FALSE) +
+  labs(x="Flat Speed", y="Climb Speed", colour="Power (W)") +
+  theme_classic()
 
 
 
@@ -233,18 +243,19 @@ zwifterbikes <- zwifterbikes[, .(frame, wheel, zb)][
 
 zwifterbikes %>% 
   ggplot(aes(x=zb, y=seconds)) +
-    geom_abline(intercept=0, slope=1) +
-    scale_x_continuous("ZwifterBikes predicted time (hh:mm)", 
-                       limits=c(3200,3900),
-                       breaks=seq(0, 100000, 120),
-                       labels=seconds_to_time(seq(0, 100000, 120), return_seconds=FALSE)) +
-    scale_y_continuous("Actual time (hh:mm)", 
-                       limits=c(3200,3900),
-                       breaks=seq(0, 100000, 120),
-                       labels=seconds_to_time(seq(0, 100000, 120), return_seconds=FALSE)) +
-    coord_equal() +
-    geom_point() +
-    geom_smooth(method="lm", se = FALSE, fullrange=TRUE)
+  geom_abline(intercept=0, slope=1) +
+  scale_x_continuous("ZwifterBikes predicted time (hh:mm)", 
+                     limits=c(3200,3900),
+                     breaks=seq(0, 100000, 120),
+                     labels=seconds_to_time(seq(0, 100000, 120), return_seconds=FALSE)) +
+  scale_y_continuous("Actual time (hh:mm)", 
+                     limits=c(3200,3900),
+                     breaks=seq(0, 100000, 120),
+                     labels=seconds_to_time(seq(0, 100000, 120), return_seconds=FALSE)) +
+  coord_equal() +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE, fullrange=TRUE) ->
+  zb_plot
 
 
 zwifterbikes[, summary(lm(seconds~zb))]
