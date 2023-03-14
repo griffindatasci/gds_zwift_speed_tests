@@ -1,9 +1,15 @@
+# TODO: All combos of wheel and bike
+# TODO: Animate sector plot
+
+
 # Libraries ====================================================================
 library(dplyr)
 library(data.table)
 library(FITfileR)
 library(googlesheets4)
 library(ggplot2)
+library(gifski)
+library(gganimate)
 
 
 # Function: Seconds formatted as time ==========================================
@@ -98,23 +104,9 @@ distance_test[!is.na(marker),
               by=marker][, mean(distance)] ->
   lap_length 
 
-# - reduced the tst data to take away post-lap observations
+# - reduced the test data to take away post-lap observations
 rides[distance <= lap_length] ->
   rides
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # Convert power to average over test (use to remove errors) ====================
@@ -123,19 +115,29 @@ rides[, power := mean(power), by=test_id][power %in% c(150, 225, 300, 900)] ->
 
 
 # Add sectors ==================================================================
-# TODO -------------------------------------------------------------------------
+distance_test[, lap := 1+(distance%/%..lap_length)]
+distance_test[, lap_distance := distance - min(distance), by=lap]
+distance_test[marker %in% c("start banner", "int epic-desert",
+                            "epic start", "epic banner",
+                            "bonus climb start", "bonus topstone",
+                            "bonus down rail", "bonus descent end",
+                            "int island-castle", "int villas-seq",
+                            "int volcano-sprint", "int volcano-downtown"), mean(lap_distance), 
+              by=marker][, .(rep(c("Ocean Blvd.", "Epic Climb", "Radio Climb", "Radio Descent",
+                                   "Epic Descent", "Sequoia to Downtown"), each = 2),
+                             rep(c("start", "finish"), times=6), 
+                             "distance"=V1)][, dcast(.SD, ...~V2, value.var="distance")][
+              order(start), .("sector"=V1, start, finish)] ->
+  sector_key
+
+for(i in seq(sector_key[,.N])){
+  rides[sector_key[i, start]<=distance & 
+        sector_key[i, finish]>=distance, 
+        sector:=sector_key[i, sector]]
+}
 
 
-# - 
-# distance_test[, lap := 1+(distance%/%..lap_length)]
-# distance_test[, lap_distance := distance - min(distance), by=lap]
-# 
-
-
-
-
-
-# Summarise ====================================================================
+# Generate test summary table ==================================================
 rides[, .("seconds"=max(time), 
           "time"=seconds_to_time(max(time)),
           "speed"=max(distance)/max(time)*3.6), keyby=.(power, frame, wheel)][
@@ -143,27 +145,73 @@ rides[, .("seconds"=max(time),
   test_summary
 
 
-test_summary[power<=300] %>% 
-  ggplot(aes(x=power, y=speed, colour=frame, shape=wheel)) +
-    geom_point(alpha=0.4) +
-    geom_line() +
-    theme(legend.position="none")
+# All combinations of frame and wheel ==========================================
+crossed <- rbindlist(lapply(c(150, 225, 300), function(watts){
+  # - Get baseline time (time for Zwift Aero frame + Zwift 32mm Carbon wheels)
+  baseline <- test_summary[power==watts & frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon", speed]
+  
+  # - Get speed relative to baseline
+  test_summary[power==watts, relative:= speed-..baseline]
+  
+  # - Get effect of each frame (excl. TRON at this point - not paired with 32mm)
+  frames <- test_summary[power==watts & frame!="TRON" & wheel=="Zwift 32mm Carbon", 
+                         .(frame, "frame_effect"=relative)]
+ 
+  # - Get effect of each wheelset
+  wheels <- test_summary[power==watts & frame=="Zwift Aero", 
+                         .(wheel, "wheel_effect"=relative)]
+  
+  # Cross-join to get all combinations (this is returned by lapply() )
+  setkey(frames[, c(k=1, .SD)], k)[wheels[, c(k=1, .SD)], allow.cartesian=TRUE][, k:=NULL][, 
+          .(frame, wheel, "power"=..watts, "speed"=frame_effect + wheel_effect + ..baseline)]
+  
+}))
+
+# - Add TRON
+crossed <- rbind(crossed, test_summary[frame=="TRON", .(frame, wheel, power, speed)])
+
+# - Derive **predicted** seconds/time
+crossed[, "seconds":=..lap_length/speed*3.6]
+crossed[, "time":=seconds_to_time(seconds)]
+
+
+# Summarise ====================================================================
+crossed[power %in% c(150, 300), 
+             .(frame, wheel, "cost"=seconds-min(seconds)), 
+             by=power] %>% 
+  ggplot(aes(x=power, y=cost, colour=frame, shape=wheel)) +
+  geom_point() +
+  geom_path() +
+  scale_y_reverse("Seconds Behind Fastest Bike") +
+  scale_x_continuous("Power",
+                     breaks=c(150,300),
+                     labels=c("150W (2W/kg)", "300W (4W/kg)")) +
+  labs(colour="Frame", shape="Wheel") +
+  theme_classic()
+
+
+
+
+
 
 
 
 
 # Summarise Sectors ============================================================
+# - Need to get speeds for sectors
+# - Apply that to all bikes
+# - Plot predicted speed for each sector
+# - Need to animate by power to show how cloud shape changes with power
+
 rides[!is.na(sector), 
       .("speed"=max(distance)/max(time)*3.6),
       keyby=.(sector, power, frame, wheel)] ->
   sector_summary
 
-
+sector_summary[, speed:=scale(speed), by=.(power, sector)]
 sector_summary[power<=300, dcast(.SD, ...~sector, value.var="speed")] %>% 
-  ggplot(aes(x=`ocean boulevard`, y=`epic kom`, colour=frame, shape=wheel)) +
+  ggplot(aes(x=`Ocean Blvd.`, y=`Epic Climb`, colour=frame, shape=wheel)) +
     geom_point(alpha=0.4)
-
-
 
 
 # ZwifterBikes =================================================================
@@ -191,6 +239,8 @@ tests[, .(frame, wheel, power, zb)][
 tests[, .(frame, wheel, power, zb)][
   test_summary[power==300, .(frame, wheel, power, seconds)], 
   on=c("frame", "wheel", "power")][, summary(lm(seconds~zb))]
+
+
 
 
 
