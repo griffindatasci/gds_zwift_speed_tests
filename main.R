@@ -184,7 +184,6 @@ crossed[, "time":=seconds_to_time(seconds)]
 
 
 # Summarise ====================================================================
-crossed[power!=900, n_tests := .N, by=.(frame, wheel)]
 crossed[power!=900 & power!=225, 
              .(frame, wheel, "cost"=seconds-min(seconds)), 
              by=power] %>% 
