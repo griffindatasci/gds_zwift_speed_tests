@@ -45,7 +45,7 @@ lapply(fit_files,
 # Read in test log (from google sheets) ----------------------------------------
 read_sheet("https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUxeqYrXXT58_0c2Hp1k",
            sheet="test_data") %>% 
-  data.table() ->
+data.table() ->
   tests
 
 
@@ -260,7 +260,7 @@ zwifterbikes %>%
 zwifterbikes[, summary(lm(seconds~zb))]
 
 
-
+zwifterbikes[, range(zb-seconds)]
 
 
 
