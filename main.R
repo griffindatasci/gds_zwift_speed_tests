@@ -1,5 +1,7 @@
 rm(list=ls())
 
+library(ggplot2)
+
 source("read_data.R")
 
 

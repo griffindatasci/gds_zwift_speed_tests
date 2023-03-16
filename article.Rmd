@@ -1,0 +1,18 @@
+---
+title: "*Which is the best bike for this route?* is not the (only) question you should be asking"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE)
+source("main.R")
+```
+
+```{r, echo=FALSE}
+crossover_plot
+crossover_plot_greyed
+crossover_plot_frames
+crossover_plot_wheels
+```
+
+
