@@ -8,6 +8,37 @@ knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE)
 source("main.R")
 ```
 
+
+- Importance of bike choice; racing, chasing PRs, KOMs and sprints
+- Resource of ZwiftInsider speed test data and derivatives (e.g. my data browser, ZwifterBikes)
+  - Details of testing
+  - Judging routes, might expect fairly aero setup to do well even on fairly climb heavy routes like Mountain Route (survey?)
+  
+```{r}
+top_300[1:20]
+```
+
+  
+- But ZI tests performed using a very specific profile of rider; 300w, 182cm, 75kg
+  - This doesn't match all riders on Zwift
+  - Varying rider power/power-to-weight ratio should change the relative importance of aerodynamic performance and climbing performance, with slow riding placing a great emphasis on climbing performance
+  - This means judging which bike is best for a given route is not just about how much climbing occurs on a route, but also needs to incorporate the profile of the rider
+- To test how rider power/power-to-weight affects performance and recommended frame and wheel choice, I used a bot to test performance of a 182cm, 75kg rider riding at 300W (4W/kg) and 150W (2W/kg)
+  - I did this test on Watopia's Mountain Route as a more representative route; it has some flat, some mixed difficulty of climbing and some descents
+  - ZI tests were on very extreme routes, either completely flat or steep climbing (so should be less sensitive to rider variation)
+  - Frame and wheel performance is independent, so wheels were tested on a Zwift Aero frame and frames tested with Zwift 32mm Carbon wheels, and frame and wheel effects used to get predicted times for each unqiue combination
+    - These predicted times were verified for a random selection of bikes
+  
+
+
+
+
+
+```{r}
+top_150[1:20]
+```
+
+
 ```{r, echo=FALSE}
 crossover_plot
 crossover_plot_greyed

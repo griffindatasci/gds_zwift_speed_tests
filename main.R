@@ -4,7 +4,7 @@ library(ggplot2)
 
 source("read_data.R")
 
-
+tests <- tests[frame!="Pinarello Dogma F"]
 
 # All combinations of frame and wheel ------------------------------------------
 crossed <- rbindlist(lapply(c(150, 225, 300), function(watts){
@@ -44,23 +44,21 @@ crossed[, best_rank:=min(cost_rank), by=.(frame, wheel)]
 
 
 # Table of top performers at 300W ----------------------------------------------
-top10_300 <- crossed[power==300][order(cost_rank)][
-  1:10, 
+top_300 <- crossed[power==300][order(cost_rank)][, 
   .(frame, wheel, 
-    "time"=ifelse(route==min(route),
+    "time"=ifelse(route==min(route, na.rm=TRUE),
                   sprintf("%02.f:%02.f         ",
                           route%/%60,
                           route%%60),
                   sprintf("%02.f:%02.f (+%02.f:%02.f)", 
                           route%/%60, 
                           route%%60, 
-                          (route-min(route))%/%60,
-                          (route-min(route))%%60)))]
+                          (route-min(route, na.rm=TRUE))%/%60,
+                          (route-min(route, na.rm=TRUE))%%60)))]
 
-top10_150 <- crossed[power==150][order(cost_rank)][
-  1:10, 
+top_150 <- crossed[power==150][order(cost_rank)][, 
   .(frame, wheel, 
-    "time"=ifelse(route==min(route),
+    "time"=ifelse(route==min(route, na.rm=TRUE),
                   sprintf("%02.f:%02.f:%02.f         ",
                           route%/%3600,
                           route%%3600%/%60, 
@@ -69,8 +67,8 @@ top10_150 <- crossed[power==150][order(cost_rank)][
                           route%/%3600,
                           route%%3600%/%60, 
                           route%%60, 
-                          (route-min(route))%/%60,
-                          (route-min(route))%%60)))]
+                          (route-min(route, na.rm=TRUE))%/%60,
+                          (route-min(route, na.rm=TRUE))%%60)))]
 
 
 
@@ -147,8 +145,8 @@ crossed[power!=900 & frame=="Scott Addict RC" & wheel!="Zwift 32mm Carbon",
 
 
 # Outputs
-# top10_300
-# top10_150
+# top_300
+# top_150
 # crossover_plot
 # ggsave("crossover.png", dpi=600, bg=NA, width=9, height=5)
 # crossover_plot_greyed
