@@ -8,7 +8,7 @@ The ZwiftInsider speed tests perform tests on two routes &mdash; the very flat T
 
 ![Profile of the Mountain Route, Watopia](mountain_route_profile.png)
 
-Rather than try to make a judgement about which bike performs best, a bot-rider (where power ouutput is controlled by computer, not by a rider on a trainer) I can test a range of frames and wheels to find the optimal setup (among tested equipment). Setting a 75kg, 182cm tall bot to ride at 300 Watts (replicating ZwiftInsider) reveals that the best bike* for this route is the Specialized Venge S-Works with DT Swiss Arc 1100 DiCut Disc wheels.
+Rather than try to make a judgement about which bike performs best, by using a bot-rider (where power output is controlled by computer, not by a rider on a trainer) I can test a range of frames and wheels to find the optimal setup in a tightly controlled experiment and without breaking a sweat. Setting a 75kg, 182cm tall bot to ride at 300 Watts (replicating ZwiftInsider) reveals that the best bike* for this route is the Specialized Venge S-Works with DT Swiss Arc 1100 DiCut Disc wheels.
 
 |Frame |Wheel |Time | 
 |------|------|-----|
