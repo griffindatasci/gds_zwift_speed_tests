@@ -10,30 +10,25 @@ should be asking
     fairly climb heavy routes like Mountain Route (survey?)
 
 ``` r
-top_300[1:20]
+all_bikes[power==300][
+  order(route),
+  .("Frame"=frame, "Wheel"=wheel, "Time"=
+      sprintf("%02.f:%02.f (+% 2s)",
+              route%/%60, route%%60, as.character(route-min(route))))][
+  1:10]
 ```
 
-    ##                          frame                        wheel           time
-    ##  1:  Specialized Venge S-Works DT Swiss ARC 1100 DiCut Disc 54:00         
-    ##  2:            Scott Addict RC DT Swiss ARC 1100 DiCut Disc 54:05 (+00:05)
-    ##  3:         Canyon Aeroad 2021 DT Swiss ARC 1100 DiCut Disc 54:05 (+00:05)
-    ##  4:                       TRON                         TRON 54:05 (+00:05)
-    ##  5: Specialized Aethos S-Works DT Swiss ARC 1100 DiCut Disc 54:09 (+00:09)
-    ##  6:  Specialized Venge S-Works                 ENVE SES 7.8 54:09 (+00:09)
-    ##  7:  Specialized Venge S-Works                     ZIPP 808 54:13 (+00:13)
-    ##  8:  Specialized Venge S-Works                     ZIPP 454 54:13 (+00:13)
-    ##  9:  Specialized Venge S-Works   DT Swiss ARC 1100 DiCut 62 54:14 (+00:14)
-    ## 10:            Scott Addict RC                 ENVE SES 7.8 54:14 (+00:14)
-    ## 11:         Canyon Aeroad 2021                 ENVE SES 7.8 54:14 (+00:14)
-    ## 12:            Scott Addict RC                     ZIPP 808 54:18 (+00:18)
-    ## 13:         Canyon Aeroad 2021                     ZIPP 808 54:18 (+00:18)
-    ## 14:            Scott Addict RC                     ZIPP 454 54:18 (+00:18)
-    ## 15:         Canyon Aeroad 2021                     ZIPP 454 54:18 (+00:18)
-    ## 16: Specialized Aethos S-Works                 ENVE SES 7.8 54:18 (+00:18)
-    ## 17:            Scott Addict RC   DT Swiss ARC 1100 DiCut 62 54:19 (+00:19)
-    ## 18:         Canyon Aeroad 2021   DT Swiss ARC 1100 DiCut 62 54:19 (+00:19)
-    ## 19:                 Zwift Aero DT Swiss ARC 1100 DiCut Disc 54:20 (+00:20)
-    ## 20: Specialized Aethos S-Works                     ZIPP 808 54:22 (+00:22)
+    ##                          Frame                        Wheel        Time
+    ##  1:  Specialized Venge S-Works DT Swiss ARC 1100 DiCut Disc 54:00 (+ 0)
+    ##  2:            Scott Addict RC DT Swiss ARC 1100 DiCut Disc 54:05 (+ 5)
+    ##  3:         Canyon Aeroad 2021 DT Swiss ARC 1100 DiCut Disc 54:05 (+ 5)
+    ##  4:                       TRON                         TRON 54:05 (+ 5)
+    ##  5: Specialized Aethos S-Works DT Swiss ARC 1100 DiCut Disc 54:09 (+ 9)
+    ##  6:  Specialized Venge S-Works                 ENVE SES 7.8 54:09 (+ 9)
+    ##  7:  Specialized Venge S-Works                     ZIPP 808 54:13 (+13)
+    ##  8:  Specialized Venge S-Works                     ZIPP 454 54:13 (+13)
+    ##  9:            Scott Addict RC                 ENVE SES 7.8 54:14 (+14)
+    ## 10:         Canyon Aeroad 2021                 ENVE SES 7.8 54:14 (+14)
 
 - But ZI tests performed using a very specific profile of rider; 300w,
   182cm, 75kg
@@ -60,29 +55,65 @@ top_300[1:20]
       bikes
 
 ``` r
-top_150[1:20]
+all_bikes[power==150&frame=="Zwift Aero"][
+  order(route),
+  .("Wheel"=wheel, "Time Behind (s)"=route-min(route))]
 ```
 
-    ##                          frame                        wheel              time
-    ##  1:            Scott Addict RC   DT Swiss ARC 1100 DiCut 62 01:25:13         
-    ##  2: Specialized Aethos S-Works   DT Swiss ARC 1100 DiCut 62 01:25:13         
-    ##  3:                       TRON                         TRON 01:25:14 (+00:01)
-    ##  4:            Scott Addict RC                 ENVE SES 7.8 01:25:15 (+00:02)
-    ##  5: Specialized Aethos S-Works                 ENVE SES 7.8 01:25:15 (+00:02)
-    ##  6:         Canyon Aeroad 2021   DT Swiss ARC 1100 DiCut 62 01:25:16 (+00:03)
-    ##  7:            Scott Addict RC DT Swiss ARC 1100 DiCut Disc 01:25:18 (+00:05)
-    ##  8: Specialized Aethos S-Works DT Swiss ARC 1100 DiCut Disc 01:25:18 (+00:05)
-    ##  9:         Canyon Aeroad 2021                 ENVE SES 7.8 01:25:18 (+00:05)
-    ## 10:  Specialized Venge S-Works   DT Swiss ARC 1100 DiCut 62 01:25:19 (+00:06)
-    ## 11:         Canyon Aeroad 2021 DT Swiss ARC 1100 DiCut Disc 01:25:21 (+00:08)
-    ## 12:            Scott Addict RC                     ZIPP 454 01:25:21 (+00:08)
-    ## 13: Specialized Aethos S-Works                     ZIPP 454 01:25:21 (+00:08)
-    ## 14:  Specialized Venge S-Works                 ENVE SES 7.8 01:25:21 (+00:08)
-    ## 15:            Scott Addict RC                     ZIPP 808 01:25:23 (+00:10)
-    ## 16: Specialized Aethos S-Works                     ZIPP 808 01:25:23 (+00:10)
-    ## 17:  Specialized Venge S-Works DT Swiss ARC 1100 DiCut Disc 01:25:24 (+00:11)
-    ## 18:         Canyon Aeroad 2021                     ZIPP 454 01:25:24 (+00:11)
-    ## 19:         Canyon Aeroad 2021                     ZIPP 808 01:25:26 (+00:13)
-    ## 20:  Specialized Venge S-Works                     ZIPP 454 01:25:27 (+00:14)
+    ##                           Wheel Time Behind (s)
+    ## 1:   DT Swiss ARC 1100 DiCut 62               0
+    ## 2:                 ENVE SES 7.8               2
+    ## 3: DT Swiss ARC 1100 DiCut Disc               5
+    ## 4:                 ENVE SES 3.4               7
+    ## 5:                     ZIPP 454               8
+    ## 6:                     ZIPP 808              10
+    ## 7:      Lightweight Meilenstein              18
+    ## 8:            Zwift 32mm Carbon              45
 
-![](article_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->![](article_files/figure-gfm/unnamed-chunk-3-2.png)<!-- -->![](article_files/figure-gfm/unnamed-chunk-3-3.png)<!-- -->![](article_files/figure-gfm/unnamed-chunk-3-4.png)<!-- -->
+``` r
+all_bikes[power==300&frame=="Zwift Aero"][
+  order(route),
+  .("Wheel"=wheel, "Time Behind (s)"=route-min(route))]
+```
+
+    ##                           Wheel Time Behind (s)
+    ## 1: DT Swiss ARC 1100 DiCut Disc               0
+    ## 2:                 ENVE SES 7.8               9
+    ## 3:                     ZIPP 808              13
+    ## 4:                     ZIPP 454              13
+    ## 5:   DT Swiss ARC 1100 DiCut 62              14
+    ## 6:                 ENVE SES 3.4              16
+    ## 7:      Lightweight Meilenstein              28
+    ## 8:            Zwift 32mm Carbon              44
+
+``` r
+all_bikes[power==150&frame=="Zwift Aero"][
+  order(epic),
+  .("Wheel"=wheel, "Time Behind (s)"=epic-min(epic))]
+```
+
+    ##                           Wheel Time Behind (s)
+    ## 1:      Lightweight Meilenstein               0
+    ## 2:                 ENVE SES 3.4               2
+    ## 3:   DT Swiss ARC 1100 DiCut 62               2
+    ## 4:                     ZIPP 454               3
+    ## 5:                 ENVE SES 7.8               4
+    ## 6:                     ZIPP 808               9
+    ## 7:            Zwift 32mm Carbon              13
+    ## 8: DT Swiss ARC 1100 DiCut Disc              13
+
+``` r
+all_bikes[power==300&frame=="Zwift Aero"][
+  order(epic),
+  .("Wheel"=wheel, "Time Behind (s)"=epic-min(epic))]
+```
+
+    ##                           Wheel Time Behind (s)
+    ## 1:   DT Swiss ARC 1100 DiCut 62               0
+    ## 2: DT Swiss ARC 1100 DiCut Disc               2
+    ## 3:                     ZIPP 454               2
+    ## 4:                 ENVE SES 7.8               2
+    ## 5:                 ENVE SES 3.4               3
+    ## 6:      Lightweight Meilenstein               4
+    ## 7:                     ZIPP 808               4
+    ## 8:            Zwift 32mm Carbon              11

@@ -1,158 +1,68 @@
-rm(list=ls())
+# - Read in datasets (tests = tests + strava + zwifterbikes)
+# - Create dataset with predicted times for all bikes
+library(data.table)
+library(googlesheets4)
 
-library(ggplot2)
+sheet_url <- "https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUxeqYrXXT58_0c2Hp1k"
 
-source("read_data.R")
 
-tests <- tests[frame!="Pinarello Dogma F"]
 
-# All combinations of frame and wheel ------------------------------------------
-crossed <- rbindlist(lapply(c(150, 225, 300), function(watts){
-  # - Get baseline time (time for Zwift Aero frame + Zwift 32mm Carbon wheels)
-  baseline <- tests[power==watts & frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon", route]
+
+# READ DATA ====================================================================
+# - Main Test Log
+tests <- data.table(read_sheet(sheet_url, sheet="tests"), key="test_id")[
+  !is.na(start_seconds), .(test_id, frame, wheel, power)]
+
+
+# - Strava Times
+strava_times <- data.table(read_sheet(sheet_url, sheet="strava_times"), key="test_id")[, .(test_id, route, ocean, epic, radio)]
+
+
+# - Merge
+tests <- tests[strava_times][frame!="Pinarello Dogma F"]
+
+
+
+
+# CROSS FOR ALL BIKES ==========================================================
+all_bikes <- rbindlist(lapply(c(150,300), function(watts){
   
-  # - Get speed relative to baseline
-  tests[power==watts, relative:= route-..baseline]
+  # - Time relative to BL
+  tests[power==watts, 
+        c("effect_route", "effect_ocean", "effect_epic", "effect_radio") :=
+          .(route   -tests[frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon" & power==watts, route],
+            ocean   -tests[frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon" & power==watts, ocean],
+            epic    -tests[frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon" & power==watts, epic],
+            radio   -tests[frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon" & power==watts, radio])]
+  
   
   # - Get effect of each frame (excl. TRON at this point - not paired with 32mm)
   frames <- tests[power==watts & frame!="TRON" & wheel=="Zwift 32mm Carbon", 
-                         .(frame, "frame_effect"=relative)]
+                  .(frame, 
+                    "frame_route"=effect_route, 
+                    "frame_ocean"=effect_ocean, 
+                    "frame_epic"=effect_epic, 
+                    "frame_radio"=effect_radio)]
+  
   
   # - Get effect of each wheelset
-  wheels <- tests[power==watts & frame=="Zwift Aero", 
-                         .(wheel, "wheel_effect"=relative)]
+  wheels <- tests[power==watts & frame=="Zwift Aero",  
+                  .(wheel, 
+                    "wheel_route"=effect_route, 
+                    "wheel_ocean"=effect_ocean, 
+                    "wheel_epic"=effect_epic, 
+                    "wheel_radio"=effect_radio)]
+  
   
   # - Cross-join to get all combinations (this is returned by lapply() )
-  setkey(frames[, c(k=1, .SD)], k)[wheels[, c(k=1, .SD)], allow.cartesian=TRUE][, k:=NULL][, 
-      .(frame, wheel, "power"=..watts, "route"=frame_effect + wheel_effect + ..baseline)]
+  crossed <- setkey(frames[, c(k=1, .SD)], k)[wheels[, c(k=1, .SD)], allow.cartesian=TRUE][, k:=NULL][, 
+                                                                                                      .(frame, wheel, "power"=..watts, 
+                                                                                                        "route"=frame_route + wheel_route + tests[frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon" & power==watts, route], 
+                                                                                                        "ocean"=frame_ocean + wheel_ocean + tests[frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon" & power==watts, ocean], 
+                                                                                                        "epic"=frame_epic + wheel_epic + tests[frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon" & power==watts, epic], 
+                                                                                                        "radio"=frame_radio + wheel_radio + tests[frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon" & power==watts, radio])]
   
+  
+  # - Add TRON
+  rbind(crossed, tests[frame=="TRON" & power==watts, .(frame, wheel, power, route, ocean, epic, radio)])
 }))
-
-# - Add TRON
-crossed <- rbind(crossed, 
-                 tests[frame=="TRON", .(frame, wheel, power, route)])
-
-
-
-
-# "cost" = time behind fastest bike (within power level) -----------------------
-crossed[, cost:=route-min(route, na.rm=TRUE), by=power]
-crossed[, cost_rank:=frank(cost, ties.method="min"), by=power]
-crossed[, best_rank:=min(cost_rank), by=.(frame, wheel)]
-
-
-
-
-# Table of top performers at 300W ----------------------------------------------
-top_300 <- crossed[power==300][order(cost_rank)][, 
-  .(frame, wheel, 
-    "time"=ifelse(route==min(route, na.rm=TRUE),
-                  sprintf("%02.f:%02.f         ",
-                          route%/%60,
-                          route%%60),
-                  sprintf("%02.f:%02.f (+%02.f:%02.f)", 
-                          route%/%60, 
-                          route%%60, 
-                          (route-min(route, na.rm=TRUE))%/%60,
-                          (route-min(route, na.rm=TRUE))%%60)))]
-
-top_150 <- crossed[power==150][order(cost_rank)][, 
-  .(frame, wheel, 
-    "time"=ifelse(route==min(route, na.rm=TRUE),
-                  sprintf("%02.f:%02.f:%02.f         ",
-                          route%/%3600,
-                          route%%3600%/%60, 
-                          route%%60),
-                  sprintf("%02.f:%02.f:%02.f (+%02.f:%02.f)", 
-                          route%/%3600,
-                          route%%3600%/%60, 
-                          route%%60, 
-                          (route-min(route, na.rm=TRUE))%/%60,
-                          (route-min(route, na.rm=TRUE))%%60)))]
-
-
-
-# Plot costs -------------------------------------------------------------------
-crossed[power!=900 & wheel!="Zwift 32mm Carbon" & frame!="Zwift Aero"] %>% 
-  ggplot(aes(x=power, y=cost, colour=frame, shape=wheel)) +
-  geom_path(alpha=0.5) +
-  geom_point(size=2) +
-  scale_y_reverse("Seconds Behind Fastest Bike") +
-  scale_x_continuous("Power",
-                     breaks=c(150, 225, 300),
-                     labels=c("150W (2W/kg)", "225W (3W/kg)", "300W (4W/kg)")) +
-  labs(colour="Frame", shape="Wheel") +
-  theme_classic() ->
-  crossover_plot
-
-
-
-# Plot costs greyed out, focus on best at each power ---------------------------
-crossed[power!=900 & frame!="Zwift Aero" & wheel!="Zwift 32mm Carbon" & best_rank!=1] %>% 
-  ggplot(aes(x=power, y=cost, group=paste0(frame, wheel))) +
-  geom_path(colour="#dddddd", alpha=0.5) +
-  geom_point(colour="#dddddd", size=2) +
-  scale_y_reverse("Seconds Behind Fastest Bike") +
-  scale_x_continuous("Power",
-                     breaks=c(150, 225, 300),
-                     labels=c("150W (2W/kg)", "225W (3W/kg)", "300W (4W/kg)")) +
-  labs(colour="Frame", shape="Wheel") +
-  theme_classic() +
-  # - add best performers in
-  geom_path(data=crossed[power %in% c(150,300) & frame!="Zwift Aero" & wheel!="Zwift 32mm Carbon" 
-                         & best_rank==1],
-            aes(colour=frame), alpha=0.5) +
-  geom_point(data=crossed[power %in% c(150,300) & frame!="Zwift Aero" & wheel!="Zwift 32mm Carbon" 
-                          & best_rank==1],
-             aes(colour=frame, shape=wheel), size=2) ->
-  crossover_plot_greyed
-
-
-
-# Plot frames only -------------------------------------------------------------
-crossed[power!=900 & wheel=="ZIPP 454" & frame!="Zwift Aero",
-        .(frame, wheel, "cost"=cost-min(cost, na.rm=TRUE)), by=power] %>% 
-  ggplot(aes(x=power, y=cost, colour=frame)) +
-  geom_path(alpha=0.5) +
-  geom_point(size=2) +
-  scale_y_reverse("Seconds Behind Fastest Frame") +
-  scale_x_continuous("Power",
-                     breaks=c(150, 225, 300),
-                     labels=c("150W (2W/kg)", "225W (3W/kg)", "300W (4W/kg)")) +
-  labs(colour="Frame") +
-  theme_classic() ->
-  crossover_plot_frames
-
-
-
-# Plot wheels only -------------------------------------------------------------
-crossed[power!=900 & frame=="Scott Addict RC" & wheel!="Zwift 32mm Carbon",
-        .(frame, wheel, "cost"=cost-min(cost)), by=power] %>% 
-  ggplot(aes(x=power, y=cost, colour=wheel)) +
-  geom_path(alpha=0.5) +
-  geom_point(size=2) +
-  scale_y_reverse("Seconds Behind Fastest Wheel") +
-  scale_x_continuous("Power",
-                     breaks=c(150, 225, 300),
-                     labels=c("150W (2W/kg)", "225W (3W/kg)", "300W (4W/kg)")) +
-  labs(colour="Wheel") +
-  theme_classic() ->
-  crossover_plot_wheels
-
-
-
-
-
-
-# Outputs
-# top_300
-# top_150
-# crossover_plot
-# ggsave("crossover.png", dpi=600, bg=NA, width=9, height=5)
-# crossover_plot_greyed
-# ggsave("crossover_focus.png", dpi=600, bg=NA, width=9, height=5)
-# crossover_plot_frames
-# ggsave("crossover_frames.png", dpi=600, bg=NA, width=9, height=5)
-# crossover_plot_wheels
-# ggsave("crossover_wheels.png", dpi=600, bg=NA, width=9, height=5)
-

@@ -15,7 +15,12 @@ source("main.R")
   - Judging routes, might expect fairly aero setup to do well even on fairly climb heavy routes like Mountain Route (survey?)
   
 ```{r}
-top_300[1:20]
+all_bikes[power==300][
+  order(route),
+  .("Frame"=frame, "Wheel"=wheel, "Time"=
+      sprintf("%02.f:%02.f (+% 2s)",
+              route%/%60, route%%60, as.character(route-min(route))))][
+  1:10]
 ```
 
   
@@ -35,15 +40,24 @@ top_300[1:20]
 
 
 ```{r}
-top_150[1:20]
+all_bikes[power==150&frame=="Zwift Aero"][
+  order(route),
+  .("Wheel"=wheel, "Time Behind (s)"=route-min(route))]
+
+all_bikes[power==300&frame=="Zwift Aero"][
+  order(route),
+  .("Wheel"=wheel, "Time Behind (s)"=route-min(route))]
 ```
 
 
-```{r, echo=FALSE}
-crossover_plot
-crossover_plot_greyed
-crossover_plot_frames
-crossover_plot_wheels
+```{r}
+all_bikes[power==150&frame=="Zwift Aero"][
+  order(epic),
+  .("Wheel"=wheel, "Time Behind (s)"=epic-min(epic))]
+
+all_bikes[power==300&frame=="Zwift Aero"][
+  order(epic),
+  .("Wheel"=wheel, "Time Behind (s)"=epic-min(epic))]
 ```
 
 
