@@ -88,8 +88,8 @@ all_bikes <- rbindlist(lapply(c(150,300), function(watts){
 
 
 
-all_bikes[, radio_climb := rnorm(.N, 660, 20)+power]
-all_bikes[, ocean := rnorm(.N, 660, 20)+power]
+all_bikes[, radio_climb := ifelse(is.na(radio_climb), rnorm(.N, mean(radio_climb, na.rm=TRUE), 20), radio_climb), by=power]
+all_bikes[, ocean := ifelse(is.na(ocean), rnorm(.N, mean(ocean, na.rm=TRUE), 20), ocean), by=power]
 
 
 # Top 5 bikes at 300 watts
