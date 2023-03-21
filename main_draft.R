@@ -85,4 +85,37 @@ all_bikes <- rbindlist(lapply(c(150,300), function(watts){
 
 
 
-all_bikes
+
+
+
+all_bikes[, radio_climb := rnorm(.N, 660, 20)+power]
+all_bikes[, ocean := rnorm(.N, 660, 20)+power]
+
+
+# Top 5 bikes at 300 watts
+# - whole route
+all_bikes[power==300][order(route), .(frame, wheel, route)][1:5]
+# - ocean
+all_bikes[power==300][order(ocean), .(frame, wheel, ocean)][1:5]
+# - epic climb
+all_bikes[power==300][order(epic_climb), .(frame, wheel, epic_climb)][1:5]
+
+# Top 5 bikes at 150 watts
+# - whole route
+all_bikes[power==150][order(route), .(frame, wheel, route)][1:5]
+# - ocean
+all_bikes[power==150][order(ocean), .(frame, wheel, ocean)][1:5]
+# - epic climb
+all_bikes[power==150][order(epic_climb), .(frame, wheel, epic_climb)][1:5]
+
+
+
+all_bikes[frame!="Zwift Aero" & wheel!="Zwift 32mm Carbon", .("focal"=ocean-min(ocean), frame, wheel), by=power][
+  , ggplot(.SD, aes(x=as.factor(power), y=focal, color=frame, shape=wheel, group=paste0(frame, wheel))) +
+    geom_path() +
+    geom_point() +
+    scale_y_reverse() +
+    scale_x_discrete(expand=c(0.1,0)) +
+    theme_classic() +
+    labs(x="Power", y="Time Behind Fastest (s)", color="Frame", shape="Wheelset")
+]
