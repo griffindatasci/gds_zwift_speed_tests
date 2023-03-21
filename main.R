@@ -11,7 +11,7 @@ sheet_url <- "https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUx
 # READ DATA ====================================================================
 # - Main Test Log
 tests <- data.table(read_sheet(sheet_url, sheet="tests"), key="test_id")[
-  !is.na(start_seconds), .(test_id, frame, wheel, power)]
+  !is.na(start_seconds) & grepl("WMR", test_id), .(test_id, frame, wheel, power)]
 
 
 # - Strava Times
@@ -19,8 +19,7 @@ strava_times <- data.table(read_sheet(sheet_url, sheet="strava_times"), key="tes
 
 
 # - Merge
-tests <- tests[strava_times][frame!="Pinarello Dogma F"]
-
+tests <- tests[strava_times]
 
 
 
