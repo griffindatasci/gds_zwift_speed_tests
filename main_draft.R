@@ -141,3 +141,4 @@ all_bikes <- rbindlist(lapply(c(150,300), function(watts){
 }))
 
 
+all_bikes
