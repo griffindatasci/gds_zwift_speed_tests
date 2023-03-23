@@ -15,7 +15,6 @@ test_log <- data.table(read_sheet(sheet_url, sheet="test_log"))[
   test_id%in%focal_tests, .(test_id, frame, wheel, power)]
 
 
-
 # get segment times ------------------------------------------------------------
 for(page_source in list.files("source_files/")){
   
@@ -35,52 +34,53 @@ for(page_source in list.files("source_files/")){
   
   test_id <- tstrsplit(gsub(">", "", test_id[[2]][1]), " ")[[1]]
   
-  
-  
-  # Get KOM data
-  kom_section <- 
-    page_body[[2]] %>% 
-    tstrsplit("pageView.activity")
-  
-  
-  kom_section <- kom_section[[1]]
-  
-  
-  kom_data <- 
-    kom_section %>% 
-    tstrsplit("start_index")
-  
-  
-  kom_index <- sapply(kom_data, function(kom) {
-    grepl('Mountain Route"|Ocean Blvd."|Epic KOM"|Radio Tower Climb"|Radio Descent"|Epic Rev. Descent"|Windfarm to Downtown"', kom)
-  })
-  
-  
-  kom_times <- sapply(kom_data[kom_index], function(kom){
-    diff(
-      as.numeric(
-        gsub('"|:|,', "", 
-             c(tstrsplit(kom, "end_index")[[1]], 
-               tstrsplit(tstrsplit(kom, "end_index")[[2]], 
-                         "flagged")[[1]]))))
-  })
-  
-  #if(test_id=="WMR00064") {x <- kom_times}
-  kom_times <- data.table(test_id, 
-                          lap=c(1L:(length(kom_times)%/%7)), 
-                          matrix(kom_times[1:(length(kom_times)%/%7*7)], 
-                                 nrow=(length(kom_times)%/%7), byrow=TRUE))
-  
-  
-  setnames(kom_times, c("test_id", "lap", "route", "ocean", "epic_climb", "radio_climb", "radio_descent", "epic_descent", "windfarm"))
-  
-  
   if(!test_id%in%read_sheet(sheet_url, "segment_times")$test_id){
+    
+    
+    # Get KOM data
+    kom_section <- 
+      page_body[[2]] %>% 
+      tstrsplit("pageView.activity")
+    
+    
+    kom_section <- kom_section[[1]]
+    
+    
+    kom_data <- 
+      kom_section %>% 
+      tstrsplit("start_index")
+    
+    
+    kom_index <- sapply(kom_data, function(kom) {
+      grepl('Mountain Route"|Ocean Blvd."|Epic KOM"|Radio Tower Climb"|Radio Descent"|Epic Rev. Descent"|Windfarm to Downtown"', kom)
+    })
+    
+    
+    kom_times <- sapply(kom_data[kom_index], function(kom){
+      diff(
+        as.numeric(
+          gsub('"|:|,', "", 
+               c(tstrsplit(kom, "end_index")[[1]], 
+                 tstrsplit(tstrsplit(kom, "end_index")[[2]], 
+                           "flagged")[[1]]))))
+    })
+    
+    #if(test_id=="WMR00064") {x <- kom_times}
+    kom_times <- data.table(test_id, 
+                            lap=c(1L:(length(kom_times)%/%7)), 
+                            matrix(kom_times[1:(length(kom_times)%/%7*7)], 
+                                   nrow=(length(kom_times)%/%7), byrow=TRUE))
+    
+    
+    setnames(kom_times, c("test_id", "lap", "route", "ocean", "epic_climb", "radio_climb", "radio_descent", "epic_descent", "windfarm"))
+    
+    
     sheet_append(sheet_url, data=kom_times, sheet="segment_times")
   }
   
   print(paste("Test", test_id, "complete!"))
 }
+
 
 
 segment_times <- data.table(read_sheet(sheet_url, "segment_times"))[test_id%in%focal_tests]
@@ -157,13 +157,15 @@ all_bikes[, epic_descent_kmh:= 5640/epic_descent*3.6]
 all_bikes[, windfarm_kmh:= 5880/windfarm*3.6]
 
 
+all_bikes[, windfarm_effect:=ifelse(power==300,
+                                    (100*windfarm_kmh/all_bikes[power==300 & frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon", windfarm_kmh])-100,
+                                    (100*windfarm_kmh/all_bikes[power==150 & frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon", windfarm_kmh])-100)]
+all_bikes[, radio_climb_effect:=ifelse(power==300,
+                                       (100*radio_climb_kmh/all_bikes[power==300 & frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon", radio_climb_kmh])-100,
+                                       (100*radio_climb_kmh/all_bikes[power==150 & frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon", radio_climb_kmh])-100)]
 
 all_bikes[#frame!="Zwift Aero" & wheel!="Zwift 32mm Carbon", 
-          ,ggplot(.SD, aes(x=5880/windfarm*3.6, y=1090/radio_climb*3.6, 
-                          colour=frame, shape=wheel)) +
-            geom_point(data=.SD[power==300]) +
-            #geom_point(data=.SD[power==150]) +
-            labs(x="Speed on Flat (km/h)",
-                 y="Speed on Climb (km/h)",
-                 colour="Frame",
-                 shape="Wheel")]
+          ,ggplot(.SD, aes(x=windfarm_effect, y=radio_climb_effect, colour=as.factor(power))) +
+            geom_point() +
+            geom_smooth(method="lm") +
+            labs(x="Speed on Flat (km/h)", y="Speed on Climb (km/h)", colour="Frame", shape="Wheel")]
