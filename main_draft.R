@@ -1,12 +1,13 @@
 library(rvest)
 library(dplyr)
 library(data.table)
+library(ggplot2)
 library(googlesheets4)
 options(googlesheets4_quiet=TRUE)
 
 
 sheet_url <- "https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUxeqYrXXT58_0c2Hp1k"
-focal_tests <- sprintf("WMR%05.f", c(59L:63L))
+focal_tests <- sprintf("WMR%05.f", c(59L:100L))
 
 
 # get test_log -----------------------------------------------------------------
@@ -64,8 +65,11 @@ for(page_source in list.files("source_files/")){
                          "flagged")[[1]]))))
   })
   
-  
-  kom_times <- data.table(test_id, lap=c(1,2), matrix(kom_times, nrow=2, byrow=TRUE))
+  #if(test_id=="WMR00064") {x <- kom_times}
+  kom_times <- data.table(test_id, 
+                          lap=c(1L:(length(kom_times)%/%7)), 
+                          matrix(kom_times[1:(length(kom_times)%/%7*7)], 
+                                 nrow=(length(kom_times)%/%7), byrow=TRUE))
   
   
   setnames(kom_times, c("test_id", "lap", "route", "ocean", "epic_climb", "radio_climb", "radio_descent", "epic_descent", "windfarm"))
@@ -85,7 +89,7 @@ segment_times <- data.table(read_sheet(sheet_url, "segment_times"))[test_id%in%f
 # merge datasets and get mean times --------------------------------------------
 test_data <- test_log[segment_times, on="test_id"][
   , -c("lap")][
-  , lapply(.SD, mean), by=.(test_id, frame, wheel, power)]
+  , c(lapply(.SD, mean), "laps"=.N), by=.(test_id, frame, wheel, power)]
 
 
 
@@ -142,3 +146,24 @@ all_bikes <- rbindlist(lapply(c(150,300), function(watts){
 
 
 all_bikes
+
+
+all_bikes[, route_kmh:=29490/route*3.6]
+all_bikes[, ocean_kmh:= 4140/ocean*3.6]
+all_bikes[, epic_climb_kmh:= 9410/epic_climb*3.6]
+all_bikes[, radio_climb_kmh:= 1090/radio_climb*3.6]
+all_bikes[, radio_descent_kmh:= 1120/radio_descent*3.6]
+all_bikes[, epic_descent_kmh:= 5640/epic_descent*3.6]
+all_bikes[, windfarm_kmh:= 5880/windfarm*3.6]
+
+
+
+all_bikes[#frame!="Zwift Aero" & wheel!="Zwift 32mm Carbon", 
+          ,ggplot(.SD, aes(x=5880/windfarm*3.6, y=1090/radio_climb*3.6, 
+                          colour=frame, shape=wheel)) +
+            geom_point(data=.SD[power==300]) +
+            #geom_point(data=.SD[power==150]) +
+            labs(x="Speed on Flat (km/h)",
+                 y="Speed on Climb (km/h)",
+                 colour="Frame",
+                 shape="Wheel")]
