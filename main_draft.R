@@ -86,6 +86,18 @@ for(page_source in list.files("source_files/")){
 segment_times <- data.table(read_sheet(sheet_url, "segment_times"))[test_id%in%focal_tests]
 
 
+
+
+segment_times[, lapply(.SD, function(j){
+  diff(range(j))}), by=test_id, .SDcols=c("ocean", "epic_climb", "radio_climb", "radio_descent", "epic_descent", "windfarm")]
+
+
+# TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
+
+
 # merge datasets and get mean times --------------------------------------------
 test_data <- test_log[segment_times, on="test_id"][
   , -c("lap")][
