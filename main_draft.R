@@ -5,7 +5,7 @@ library(ggplot2)
 library(googlesheets4)
 options(googlesheets4_quiet=TRUE)
 
-
+update_segments <- FALSE
 sheet_url <- "https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUxeqYrXXT58_0c2Hp1k"
 focal_tests <- sprintf("WMR%05.f", c(59L:100L))
 
@@ -16,85 +16,85 @@ test_log <- data.table(read_sheet(sheet_url, sheet="test_log"))[
 
 
 # get segment times ------------------------------------------------------------
-for(page_source in list.files("source_files/")){
-  
-  # Read in view-source file
-  page_body <- 
-    read_html(paste0("source_files/", page_source)) %>% 
-    html_node("body") %>% 
-    html_text() %>% 
-    tstrsplit("pageView.segmentEfforts")
-  
-  
-  
-  # Extract test identifier (name of activity)
-  test_id <- page_body %>% 
-    tstrsplit("title") 
-  
-  
-  test_id <- tstrsplit(gsub(">", "", test_id[[2]][1]), " ")[[1]]
-  
-  if(!test_id%in%read_sheet(sheet_url, "segment_times")$test_id){
+if(update_segments){
+  for(page_source in list.files("source_files/")){
+    
+    # Read in view-source file
+    page_body <- 
+      read_html(paste0("source_files/", page_source)) %>% 
+      html_node("body") %>% 
+      html_text() %>% 
+      tstrsplit("pageView.segmentEfforts")
     
     
-    # Get KOM data
-    kom_section <- 
-      page_body[[2]] %>% 
-      tstrsplit("pageView.activity")
+    
+    # Extract test identifier (name of activity)
+    test_id <- page_body %>% 
+      tstrsplit("title") 
     
     
-    kom_section <- kom_section[[1]]
+    test_id <- tstrsplit(gsub(">", "", test_id[[2]][1]), " ")[[1]]
     
+    if(!test_id%in%read_sheet(sheet_url, "segment_times")$test_id){
+      
+      
+      # Get KOM data
+      kom_section <- 
+        page_body[[2]] %>% 
+        tstrsplit("pageView.activity")
+      
+      
+      kom_section <- kom_section[[1]]
+      
+      
+      kom_data <- 
+        kom_section %>% 
+        tstrsplit("start_index")
+      
+      
+      kom_index <- sapply(kom_data, function(kom) {
+        grepl('Mountain Route"|Ocean Blvd."|Epic KOM"|Radio Tower Climb"|Radio Descent"|Epic Rev. Descent"|Windfarm to Downtown"', kom)
+      })
+      
+      
+      kom_times <- sapply(kom_data[kom_index], function(kom){
+        diff(
+          as.numeric(
+            gsub('"|:|,', "", 
+                 c(tstrsplit(kom, "end_index")[[1]], 
+                   tstrsplit(tstrsplit(kom, "end_index")[[2]], 
+                             "flagged")[[1]]))))
+      })
+      
+      kom_times <- data.table(test_id, 
+                              lap=c(1L:(length(kom_times)%/%7)), 
+                              matrix(kom_times[1:(length(kom_times)%/%7*7)], 
+                                     nrow=(length(kom_times)%/%7), byrow=TRUE))
+      
+      
+      setnames(kom_times, c("test_id", "lap", "route", "ocean", "epic_climb", "radio_climb", "radio_descent", "epic_descent", "windfarm"))
+      
+      
+      sheet_append(sheet_url, data=kom_times, sheet="segment_times")
+    }
     
-    kom_data <- 
-      kom_section %>% 
-      tstrsplit("start_index")
-    
-    
-    kom_index <- sapply(kom_data, function(kom) {
-      grepl('Mountain Route"|Ocean Blvd."|Epic KOM"|Radio Tower Climb"|Radio Descent"|Epic Rev. Descent"|Windfarm to Downtown"', kom)
-    })
-    
-    
-    kom_times <- sapply(kom_data[kom_index], function(kom){
-      diff(
-        as.numeric(
-          gsub('"|:|,', "", 
-               c(tstrsplit(kom, "end_index")[[1]], 
-                 tstrsplit(tstrsplit(kom, "end_index")[[2]], 
-                           "flagged")[[1]]))))
-    })
-    
-    #if(test_id=="WMR00064") {x <- kom_times}
-    kom_times <- data.table(test_id, 
-                            lap=c(1L:(length(kom_times)%/%7)), 
-                            matrix(kom_times[1:(length(kom_times)%/%7*7)], 
-                                   nrow=(length(kom_times)%/%7), byrow=TRUE))
-    
-    
-    setnames(kom_times, c("test_id", "lap", "route", "ocean", "epic_climb", "radio_climb", "radio_descent", "epic_descent", "windfarm"))
-    
-    
-    sheet_append(sheet_url, data=kom_times, sheet="segment_times")
+    print(paste("Test", test_id, "complete!"))
   }
-  
-  print(paste("Test", test_id, "complete!"))
 }
-
 
 
 segment_times <- data.table(read_sheet(sheet_url, "segment_times"))[test_id%in%focal_tests]
 
 
-
-
-segment_times[, lapply(.SD, function(j){
-  diff(range(j))}), by=test_id, .SDcols=c("ocean", "epic_climb", "radio_climb", "radio_descent", "epic_descent", "windfarm")]
+segment_times[, lapply(.SD, function(j){ diff(range(j)) }),  
+              by=test_id, 
+              .SDcols=c("route", "ocean", "epic_climb", "radio_climb", "radio_descent", 
+                        "epic_descent", "windfarm")][, max(.SD), by=test_id][V1>2]
 
 
 # TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
+# - id and remove bad tests
 
 
 
