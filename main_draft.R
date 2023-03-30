@@ -5,13 +5,15 @@ library(ggplot2)
 library(googlesheets4)
 options(googlesheets4_quiet=TRUE)
 
-update_segments <- FALSE
+update_segments <- TRUE
 sheet_url <- "https://docs.google.com/spreadsheets/d/1IFuQUhQ1Ek6JTa5X2ZJpFEfSUxeqYrXXT58_0c2Hp1k"
 focal_tests <- sprintf("WMR%05.f", c(59L:100L))
 
 
 # get test_log -----------------------------------------------------------------
-test_log <- data.table(read_sheet(sheet_url, sheet="test_log"))[
+test_log <- read_sheet(sheet_url, sheet="test_log")
+1
+test_log <- data.table(test_log)[
   test_id%in%focal_tests, .(test_id, frame, wheel, power)]
 
 
@@ -74,6 +76,7 @@ if(update_segments){
       
       setnames(kom_times, c("test_id", "lap", "route", "ocean", "epic_climb", "radio_climb", "radio_descent", "epic_descent", "windfarm"))
       
+      kom_times <- test_log[, .(test_id, frame, wheel, power)][kom_times, on="test_id"]
       
       sheet_append(sheet_url, data=kom_times, sheet="segment_times")
     }
@@ -86,22 +89,27 @@ if(update_segments){
 segment_times <- data.table(read_sheet(sheet_url, "segment_times"))[test_id%in%focal_tests]
 
 
-segment_times[, lapply(.SD, function(j){ diff(range(j)) }),  
-              by=test_id, 
-              .SDcols=c("route", "ocean", "epic_climb", "radio_climb", "radio_descent", 
-                        "epic_descent", "windfarm")][, max(.SD), by=test_id][V1>2]
 
 
-# TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# get mean times -------------------------------------------------------------
+segment_times[, laps:=.N, by=.(frame, wheel, power)]
 
-# - id and remove bad tests
+# - flag suspicious times (those differing by >2 seconds from frame/wheel/power median)
+segment_times[, flag := ifelse(1>=
+  segment_times[, -c("lap", "test_id")][
+    , lapply(.SD, function(j){abs(j-median(j))}), by=.(frame, wheel, power, laps)][
+      , -c("frame", "wheel", "power", "laps")][, apply(.SD, 1, max)], FALSE, TRUE)]
 
 
+# - restrict to tests with 2+ laps
+flagged_laps <- segment_times[flag==TRUE]
+segment_times <- segment_times[flag!=TRUE]
+segment_times[, laps:=.N, by=.(frame, wheel, power)]
+segment_times <- segment_times[laps>=2, -c("flag")]
 
-# merge datasets and get mean times --------------------------------------------
-test_data <- test_log[segment_times, on="test_id"][
-  , -c("lap")][
-  , c(lapply(.SD, mean), "laps"=.N), by=.(test_id, frame, wheel, power)]
+
+# - mean times per segment
+test_data <- segment_times[, -c("lap", "test_id")][, lapply(.SD, mean), by=.(frame, wheel, power)]
 
 
 
@@ -140,16 +148,17 @@ all_bikes <- rbindlist(lapply(c(150,300), function(watts){
   
   
   # - Cross-join to get all combinations (this is returned by lapply() )
-  crossed <- setkey(frames[, c(k=1, .SD)], k)[wheels[, c(k=1, .SD)], allow.cartesian=TRUE][, k:=NULL][, 
-                                                                                                      .(frame, wheel, "power"=..watts, 
-                                                                                                        "route"=route_fr + route_wh + test_data[baseline==TRUE & power==watts, route], 
-                                                                                                        "ocean"=ocean_fr + ocean_wh + test_data[baseline==TRUE & power==watts, ocean], 
-                                                                                                        "epic_climb"=epic_climb_fr + epic_climb_wh + test_data[baseline==TRUE & power==watts, epic_climb], 
-                                                                                                        "radio_climb"=radio_climb_fr + radio_climb_wh + test_data[baseline==TRUE & power==watts, radio_climb], 
-                                                                                                        "radio_descent"=radio_descent_fr + radio_descent_wh + test_data[baseline==TRUE & power==watts, radio_descent], 
-                                                                                                        "epic_descent"=epic_descent_fr + epic_descent_wh + test_data[baseline==TRUE & power==watts, epic_descent], 
-                                                                                                        "windfarm"=windfarm_fr + windfarm_wh + test_data[baseline==TRUE & power==watts, windfarm]
-                                                                                                      )]
+  crossed <- setkey(frames[, c(k=1, .SD)], k)[wheels[, c(k=1, .SD)], allow.cartesian=TRUE][, k:=NULL][
+    , 
+    .(frame, wheel, "power"=..watts, 
+      "route"=route_fr + route_wh + test_data[baseline==TRUE & power==watts, route], 
+      "ocean"=ocean_fr + ocean_wh + test_data[baseline==TRUE & power==watts, ocean], 
+      "epic_climb"=epic_climb_fr + epic_climb_wh + test_data[baseline==TRUE & power==watts, epic_climb], 
+      "radio_climb"=radio_climb_fr + radio_climb_wh + test_data[baseline==TRUE & power==watts, radio_climb], 
+      "radio_descent"=radio_descent_fr + radio_descent_wh + test_data[baseline==TRUE & power==watts, radio_descent], 
+      "epic_descent"=epic_descent_fr + epic_descent_wh + test_data[baseline==TRUE & power==watts, epic_descent], 
+      "windfarm"=windfarm_fr + windfarm_wh + test_data[baseline==TRUE & power==watts, windfarm]
+    )]
   
   
   # - Add TRON
@@ -169,15 +178,6 @@ all_bikes[, epic_descent_kmh:= 5640/epic_descent*3.6]
 all_bikes[, windfarm_kmh:= 5880/windfarm*3.6]
 
 
-all_bikes[, windfarm_effect:=ifelse(power==300,
-                                    (100*windfarm_kmh/all_bikes[power==300 & frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon", windfarm_kmh])-100,
-                                    (100*windfarm_kmh/all_bikes[power==150 & frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon", windfarm_kmh])-100)]
-all_bikes[, radio_climb_effect:=ifelse(power==300,
-                                       (100*radio_climb_kmh/all_bikes[power==300 & frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon", radio_climb_kmh])-100,
-                                       (100*radio_climb_kmh/all_bikes[power==150 & frame=="Zwift Aero" & wheel=="Zwift 32mm Carbon", radio_climb_kmh])-100)]
 
-all_bikes[#frame!="Zwift Aero" & wheel!="Zwift 32mm Carbon", 
-          ,ggplot(.SD, aes(x=windfarm_effect, y=radio_climb_effect, colour=as.factor(power))) +
-            geom_point() +
-            geom_smooth(method="lm") +
-            labs(x="Speed on Flat (km/h)", y="Speed on Climb (km/h)", colour="Frame", shape="Wheel")]
+# Tests to do as prioity:
+test_data[, .("w150"=max(power==150), "w300"=max(power==300)), by=.(frame, wheel)]
