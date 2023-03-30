@@ -88,13 +88,13 @@ segment_times <- data.table(read_sheet(sheet_url, "new_segment_times"))[!(test_i
 
 
 # identify outliers ------------------------------------------------------------
-segment_times[, -c("test_id", "lap")][, lapply(.SD, function(j){abs(j-median(j))}), keyby=.(frame, wheel, power)][, max(.SD), by=.(frame, wheel, power)][V1>=2]
+segment_times[, max:=segment_times[, -c("test_id", "lap")][, lapply(.SD, function(j){abs(j-median(j))}), keyby=.(frame, wheel, power)][, -c("frame", "wheel", "power")][, apply(.SD, 1, max)]]
 
-
+segment_times[max>=2]
 
 
 # get segment averages for all frame/wheel/power combinations with 3+ times from 2+ tests
-
+segment_times[, -c("lap", "test_id", "max")][, lapply(.SD, mean), by=.(frame, wheel, power)]
 
 
 
